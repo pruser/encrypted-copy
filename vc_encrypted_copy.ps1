@@ -64,7 +64,7 @@ $size = ($items | Measure-Object -Sum Length).Sum
 $size = containerSize($size)
 
 
-Write-Output "Creating container $out - size: $size"
+Write-Output "Creating container - $out - size: $size"
 & "VeraCrypt Format.exe" /create "$out" /size "$size" /filesystem "$fs" /encryption "$enc" /password "$pass" /hash "$hash" /silent 
 
 while (!(Test-File "$out")) { Start-Sleep 1 }
