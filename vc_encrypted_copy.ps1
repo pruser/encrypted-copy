@@ -31,15 +31,15 @@ function containerSize($size) {
       break
     }
     {$_ -le 100MB} {
-      [int]($size * 1.05)
+      [System.Int64]($size * 1.05)
       break
     }
     {$_ -le 1GB} {
-      [int]($size * 1.01)
+      [System.Int64]($size * 1.01)
       break
     }
     default {
-      [int]($size * 1.005)
+      [System.Int64]($size * 1.005)
       break
     }
   }
