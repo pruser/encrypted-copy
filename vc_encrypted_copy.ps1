@@ -4,10 +4,11 @@ Param(
   [string]$fs="fat",
   [string]$hash="sha-512",
   [string]$enc="AES",
-  [string]$letter="z"
+  [string]$letter="z",
+  [string]$containerSize="0"
 )
 
-function Test-File([string] $path) {
+function Test-File([string]$path) {
   if (!(Test-Path $Path)) {
     return $false
   }
@@ -24,29 +25,50 @@ function Convert-ToString([System.Security.SecureString]$secstr) {
   [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secstr))
 }
 
-function containerSize($size) {
+function getMinContainerSize([int64]$size) {
   switch ( $size ) {
     {$_ -le 5MB} {
-      5MB
+      6MB
       break
     }
     {$_ -le 100MB} {
-      [System.Int64]($size * 1.05)
+      [int64]($size * 1.05)
       break
     }
     {$_ -le 1GB} {
-      [System.Int64]($size * 1.01)
+      [int64]($size * 1.01)
       break
     }
     default {
-      [System.Int64]($size * 1.005)
+      [int64]($size * 1.01)
       break
     }
   }
 }
 
-$securePassword = Read-Host -Prompt "Enter password" -AsSecureString 
-$pass = Convert-ToString $securePassword
+function convertRequestedContainerSizeStr([string]$size) {
+  switch ($size) {
+    {$_ -cmatch "\d+TB"} {
+      [int]$_.Replace('TB', '') * 1TB
+      break
+    }
+    {$_ -cmatch "\d+GB"} {
+      [int]$_.Replace('GB', '') * 1GB
+      break
+    }
+    {$_ -cmatch "\d+MB"} {
+      [int]$_.Replace('MB', '') * 1MB
+      break
+    }
+    {[string]::IsNullOrEmpty($_)} {
+      0
+      break
+    }
+    default {
+       Write-Error "Wrong requested container size - $size - should be in format '{0..9}+[TB|GB|MB]'" -ErrorAction Stop
+    }
+  }
+}
 
 $driveLetter = $letter+":"
 
@@ -61,8 +83,21 @@ if (Test-Path $driveLetter) {
 $items = Get-ChildItem -Recurse -Path $in
 
 $size = ($items | Measure-Object -Sum Length).Sum
-$size = containerSize($size)
 
+$minContainerSize = getMinContainerSize($size)
+$contSize = convertRequestedContainerSizeStr($containerSize)
+
+if ($contSize -ne 0) {
+  if ($contSize -lt $minContainerSize) {
+    Write-Error "Forced container size $contSize it too small - minimal container size is $minContainerSize" -ErrorAction Stop
+  }
+  $size = $contSize
+} else {
+  $size = $minContainerSize
+}
+
+$securePassword = Read-Host -Prompt "Enter password" -AsSecureString 
+$pass = Convert-ToString $securePassword
 
 Write-Output "Creating container - $out - size: $size"
 & "VeraCrypt Format.exe" /create "$out" /size "$size" /filesystem "$fs" /encryption "$enc" /password "$pass" /hash "$hash" /silent 
